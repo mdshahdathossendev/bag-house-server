@@ -2,8 +2,12 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
+const { OpenAI } = require('openai');
+
 const app = express();
 const PORT = process.env.PORT || 5000;
+
+
 
 // Middleware
 app.use(cors());
@@ -120,6 +124,99 @@ app.delete('/foods/:id', async (req, res) => {
   } catch (error) {
     console.error('Error deleting food:', error);
     res.status(500).json({ error: 'Internal Server Error', message: error.message });
+  }
+});
+
+app.post('/chat', async (req, res) => {
+  try {
+    const { messages, model } = req.body;
+    if (!messages || !Array.isArray(messages) || messages.length === 0) {
+      return res.status(400).json({ error: 'Validation failed: messages must be a non-empty array.' });
+    }
+
+    // Get Groq API key (check both GROQ_API_KEY and OPENAI_API_KEY if it's a Groq key)
+    let apiKey = process.env.GROQ_API_KEY;
+    if (!apiKey || apiKey === 'your_groq_api_key_here') {
+      const openaiKey = process.env.OPENAI_API_KEY;
+      if (openaiKey && openaiKey.startsWith('gsk_')) {
+        apiKey = openaiKey;
+      }
+    }
+
+    if (!apiKey) {
+      return res.status(500).json({
+        error: 'Groq API is not configured.',
+        message: 'Please define GROQ_API_KEY in your .env file (or set OPENAI_API_KEY to a Groq key starting with gsk_).'
+      });
+    }
+
+    const openai = new OpenAI({
+      apiKey,
+      baseURL: "https://api.groq.com/openai/v1"
+    });
+
+    const chatCompletion = await openai.chat.completions.create({
+      messages,
+      model: model || 'llama-3.3-70b-versatile',
+    });
+
+    return res.json({
+      message: chatCompletion.choices[0].message,
+      usage: chatCompletion.usage
+    });
+  } catch (error) {
+    console.error('Error in /chat endpoint:', error);
+    res.status(500).json({
+      error: 'Failed to complete chat request',
+      message: error.message
+    });
+  }
+});
+
+// Dedicated Groq chat endpoint
+app.post('/groq-chat', async (req, res) => {
+  try {
+    const { messages, model } = req.body;
+    if (!messages || !Array.isArray(messages) || messages.length === 0) {
+      return res.status(400).json({ error: 'Validation failed: messages must be a non-empty array.' });
+    }
+
+    // Get Groq API key (check both GROQ_API_KEY and OPENAI_API_KEY if it's a Groq key)
+    let apiKey = process.env.GROQ_API_KEY;
+    if (!apiKey || apiKey === 'your_groq_api_key_here') {
+      const openaiKey = process.env.OPENAI_API_KEY;
+      if (openaiKey && openaiKey.startsWith('gsk_')) {
+        apiKey = openaiKey;
+      }
+    }
+
+    if (!apiKey) {
+      return res.status(500).json({
+        error: 'Groq API is not configured.',
+        message: 'Please define GROQ_API_KEY in your .env file (or set OPENAI_API_KEY to a Groq key starting with gsk_).'
+      });
+    }
+
+    const openai = new OpenAI({
+      apiKey,
+      baseURL: "https://api.groq.com/openai/v1"
+    });
+
+    const chatCompletion = await openai.chat.completions.create({
+      messages,
+      model: model || 'llama-3.3-70b-versatile',
+    });
+
+    return res.json({
+      message: chatCompletion.choices[0].message,
+      usage: chatCompletion.usage
+    });
+  } catch (error) {
+    console.error('Error in /groq-chat endpoint:', error);
+    res.status(500).json({
+      error: 'Failed to complete Groq chat request',
+      message: error.message
+    });
   }
 });
 
